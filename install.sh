@@ -27,6 +27,69 @@ cleanup() {
 trap cleanup EXIT
 trap 'error "Failed at line $LINENO (exit code $?)"' ERR
 
+patch_linux_ui() {
+    local app_extracted="$1"
+    local main_bundle
+    main_bundle=$(find "$app_extracted/.vite/build" -maxdepth 1 -name 'main-*.js' | head -1)
+    [ -n "$main_bundle" ] || error "Could not find Electron main bundle"
+
+    python3 - "$main_bundle" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+patches = [
+    (
+        "await P.refreshApplicationMenu({triggerProviderRefresh:!0}),x(`application menu refreshed`",
+        "await P.refreshApplicationMenu({triggerProviderRefresh:!0}),process.platform===`linux`&&t.Menu.setApplicationMenu(null),x(`application menu refreshed`",
+    ),
+    (
+        "let te=await O.ensureHostWindow(v);te&&(te.isMinimized()&&te.restore(),te.show(),te.focus())",
+        "let te=await O.ensureHostWindow(v);te&&(process.platform===`linux`&&(te.setAutoHideMenuBar(!0),te.setMenuBarVisibility(!1)),te.isMinimized()&&te.restore(),te.show(),te.focus())",
+    ),
+]
+
+for patch_from, patch_to in patches:
+    if patch_to in text:
+        continue
+    if patch_from not in text:
+        raise SystemExit(f"Patch target missing: {patch_from[:80]}")
+    text = text.replace(patch_from, patch_to, 1)
+
+path.write_text(text)
+PY
+
+    local webview_index="$app_extracted/webview/index.html"
+    local live_js="$app_extracted/webview/assets/omarchy-theme-live.js"
+    cp "$SCRIPT_DIR/support/omarchy-theme-live.js" "$live_js"
+
+    python3 - "$webview_index" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+html = path.read_text()
+
+css_link = '    <link rel="stylesheet" href="./assets/omarchy-theme.css">\n'
+live_script = '    <script src="./assets/omarchy-theme-live.js"></script>\n'
+
+if "./assets/omarchy-theme.css" not in html:
+    needle = '  <meta http-equiv="Content-Security-Policy"'
+    if needle in html:
+        html = html.replace(needle, css_link + needle, 1)
+
+if "./assets/omarchy-theme-live.js" not in html:
+    needle = "  </body>"
+    if needle in html:
+        html = html.replace(needle, live_script + needle, 1)
+
+path.write_text(html)
+PY
+
+    info "Linux UI patches applied"
+}
+
 # ---- Check dependencies ----
 check_deps() {
     local missing=()
@@ -161,6 +224,7 @@ patch_asar() {
 
     # Build native modules in clean environment and copy back
     build_native_modules "$WORK_DIR/app-extracted"
+    patch_linux_ui "$WORK_DIR/app-extracted"
 
     # Repack
     info "Repacking app.asar..."
@@ -222,6 +286,7 @@ create_start_script() {
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEBVIEW_DIR="$SCRIPT_DIR/content/webview"
+THEME_SYNC_SCRIPT="$SCRIPT_DIR/sync-theme.py"
 
 pkill -f "http.server 5175" 2>/dev/null
 sleep 0.3
@@ -230,7 +295,6 @@ if [ -d "$WEBVIEW_DIR" ] && [ "$(ls -A "$WEBVIEW_DIR" 2>/dev/null)" ]; then
     cd "$WEBVIEW_DIR"
     python3 -m http.server 5175 &> /dev/null &
     HTTP_PID=$!
-    trap "kill $HTTP_PID 2>/dev/null" EXIT
 fi
 
 export CODEX_CLI_PATH="${CODEX_CLI_PATH:-$(which codex 2>/dev/null)}"
@@ -240,12 +304,26 @@ if [ -z "$CODEX_CLI_PATH" ]; then
     exit 1
 fi
 
+if [ -f "$THEME_SYNC_SCRIPT" ]; then
+    python3 "$THEME_SYNC_SCRIPT" &> /dev/null || true
+    python3 "$THEME_SYNC_SCRIPT" --watch &> /dev/null &
+    THEME_PID=$!
+fi
+
+trap "kill ${HTTP_PID:-} ${THEME_PID:-} 2>/dev/null" EXIT
+
 cd "$SCRIPT_DIR"
 exec "$SCRIPT_DIR/electron" --no-sandbox "$@"
 SCRIPT
 
     chmod +x "$INSTALL_DIR/start.sh"
     info "Start script created"
+}
+
+install_support_files() {
+    cp "$SCRIPT_DIR/support/sync-theme.py" "$INSTALL_DIR/sync-theme.py"
+    chmod +x "$INSTALL_DIR/sync-theme.py"
+    info "Support files installed"
 }
 
 # ---- Main ----
@@ -272,6 +350,7 @@ main() {
     download_electron
     extract_webview "$app_dir"
     install_app
+    install_support_files
     create_start_script
 
     if ! command -v codex &>/dev/null; then

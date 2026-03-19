@@ -1,8 +1,14 @@
-# Codex Desktop for Linux
+# Omarchy Codex App
 
-Run [OpenAI Codex Desktop](https://openai.com/codex/) on Linux.
+Run the [OpenAI Codex app](https://openai.com/codex/) on Linux with Omarchy-focused polish.
 
-The official Codex Desktop app is macOS-only. This project provides an automated installer that converts the macOS `.dmg` into a working Linux application.
+The official Codex app is macOS/Windows-first. This fork provides an automated installer that converts the macOS `.dmg` into a working Linux application and adds Omarchy-specific desktop integration.
+
+This fork also adds Linux desktop polish:
+
+- hides the default Electron menu bar on Linux
+- adds optional Omarchy theme syncing when `~/.config/omarchy/current/theme/colors.toml` exists
+- supports live theme reloads while the app is running
 
 ## How it works
 
@@ -14,6 +20,7 @@ The installer:
 4. Removes macOS-only modules (`sparkle` auto-updater)
 5. Downloads Linux Electron (same version as the app — v40)
 6. Repacks everything and creates a launch script
+7. Applies Linux UI patches for menu hiding and optional Omarchy theming
 
 ## Prerequisites
 
@@ -77,6 +84,8 @@ Or add an alias to your shell:
 echo 'alias codex-desktop="~/codex-desktop-linux/codex-app/start.sh"' >> ~/.bashrc
 ```
 
+If Omarchy is installed, Codex will automatically read the active theme from `~/.config/omarchy/current/theme/colors.toml` and keep the app synced while it is running.
+
 ### Custom install directory
 
 ```bash
@@ -103,6 +112,7 @@ A small Python HTTP server is used as a workaround: when `app.isPackaged` is `fa
 | `CODEX_CLI_PATH` error | Install CLI: `npm i -g @openai/codex` |
 | GPU/rendering issues | Try: `./codex-app/start.sh --disable-gpu` |
 | Sandbox errors | The `--no-sandbox` flag is already set in `start.sh` |
+| Omarchy colors do not apply | Confirm `~/.config/omarchy/current/theme/colors.toml` exists, then restart Codex once |
 
 ## Disclaimer
 
