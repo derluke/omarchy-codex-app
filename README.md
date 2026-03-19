@@ -4,11 +4,23 @@ Run the [OpenAI Codex app](https://openai.com/codex/) on Linux with Omarchy-focu
 
 The official Codex app is macOS/Windows-first. This fork provides an automated installer that converts the macOS `.dmg` into a working Linux application and adds Omarchy-specific desktop integration.
 
-This fork also adds Linux desktop polish:
+Forked from [`ilysenko/codex-desktop-linux`](https://github.com/ilysenko/codex-desktop-linux) and intentionally kept Omarchy-specific rather than generic.
+
+## What This Fork Adds
 
 - hides the default Electron menu bar on Linux
 - adds optional Omarchy theme syncing when `~/.config/omarchy/current/theme/colors.toml` exists
 - supports live theme reloads while the app is running
+
+## Quick Start
+
+```bash
+git clone https://github.com/derluke/omarchy-codex-app.git
+cd omarchy-codex-app
+./install.sh
+```
+
+If you are running Omarchy, the installed app will pick up the active Omarchy theme automatically.
 
 ## How it works
 
@@ -56,8 +68,8 @@ npm i -g @openai/codex
 ### Option A: Auto-download DMG
 
 ```bash
-git clone https://github.com/ilysenko/codex-desktop-linux.git
-cd codex-desktop-linux
+git clone https://github.com/derluke/omarchy-codex-app.git
+cd omarchy-codex-app
 chmod +x install.sh
 ./install.sh
 ```
@@ -74,14 +86,12 @@ Download `Codex.dmg` from [openai.com/codex](https://openai.com/codex/), then:
 
 The app is installed into `codex-app/` next to the install script:
 
-```bash
-codex-desktop-linux/codex-app/start.sh
-```
+`codex-app/start.sh`
 
 Or add an alias to your shell:
 
 ```bash
-echo 'alias codex-desktop="~/codex-desktop-linux/codex-app/start.sh"' >> ~/.bashrc
+echo 'alias codex-desktop="~/omarchy-codex-app/codex-app/start.sh"' >> ~/.bashrc
 ```
 
 If Omarchy is installed, Codex will automatically read the active theme from `~/.config/omarchy/current/theme/colors.toml` and keep the app synced while it is running.
@@ -116,7 +126,7 @@ A small Python HTTP server is used as a workaround: when `app.isPackaged` is `fa
 
 ## Disclaimer
 
-This is an unofficial community project. Codex Desktop is a product of OpenAI. This tool does not redistribute any OpenAI software — it automates the conversion process that users perform on their own copies.
+This is an unofficial community fork. Codex is a product of OpenAI. This tool does not redistribute any OpenAI software — it automates the conversion process that users perform on their own copies.
 
 ## License
 
