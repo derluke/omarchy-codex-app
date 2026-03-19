@@ -18,7 +18,7 @@ LIGHT_MODE = THEME_DIR / "light.mode"
 def parse_colors(path: Path) -> dict[str, str]:
     colors: dict[str, str] = {}
     if not path.exists():
-      return colors
+        return colors
     pattern = re.compile(r'^([A-Za-z0-9_]+)\s*=\s*"([^"]+)"\s*$')
     for line in path.read_text().splitlines():
         match = pattern.match(line.strip())
@@ -51,13 +51,18 @@ def render_css(colors: dict[str, str], mode: str) -> str:
     color15 = colors.get("color15", "#eceff4")
 
     return f""":root,
-:host {{
+:host,
+.electron-dark,
+.electron-light {{
   --vscode-foreground: {foreground};
   --vscode-disabledForeground: {color8};
   --vscode-descriptionForeground: {color7};
   --vscode-icon-foreground: {foreground};
 
   --vscode-sideBar-background: {background};
+  --color-background-surface-under: {background};
+  --color-background-elevated-primary: {background};
+  --color-background-elevated-secondary: {selection_bg};
   --color-background-surface: {color0};
   --vscode-editor-background: {background};
   --vscode-editor-foreground: {foreground};
@@ -134,6 +139,29 @@ def render_css(colors: dict[str, str], mode: str) -> str:
   --vscode-charts-red: {color1};
   --vscode-charts-yellow: {color3};
   color-scheme: {mode};
+}}
+
+.bg-\\[\\#1e1e1e\\],
+.bg-\\[var\\(--vscode-editor-background\\)\\],
+.main-surface {{
+  background-color: {background} !important;
+}}
+
+.window-fx-sidebar-surface,
+.app-header-tint {{
+  background-color: color-mix(in srgb, {background} 92%, transparent) !important;
+}}
+
+.window-fx-sidebar-surface [data-state='active'],
+.window-fx-sidebar-surface .bg-token-list-hover-background {{
+  background-color: {selection_bg} !important;
+}}
+
+.window-fx-sidebar-surface [data-state='active'],
+.window-fx-sidebar-surface [data-state='active'] *,
+.window-fx-sidebar-surface .bg-token-list-hover-background,
+.window-fx-sidebar-surface .bg-token-list-hover-background * {{
+  color: {selection_fg} !important;
 }}
 """
 
