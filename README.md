@@ -11,6 +11,7 @@ Forked from [`ilysenko/codex-desktop-linux`](https://github.com/ilysenko/codex-d
 - hides the default Electron menu bar on Linux
 - adds optional Omarchy theme syncing when `~/.config/omarchy/current/theme/colors.toml` exists
 - supports live theme reloads while the app is running
+- installs a Linux desktop entry automatically in `~/.local/share/applications/codex.desktop`
 
 ## Quick Start
 
@@ -88,6 +89,8 @@ The app is installed into `codex-app/` next to the install script:
 
 `codex-app/start.sh`
 
+The installer also creates a desktop launcher automatically, so Codex should appear in your application menu/dock after install.
+
 Or add an alias to your shell:
 
 ```bash
@@ -123,6 +126,7 @@ A small Python HTTP server is used as a workaround: when `app.isPackaged` is `fa
 | GPU/rendering issues | Try: `./codex-app/start.sh --disable-gpu` |
 | Sandbox errors | The `--no-sandbox` flag is already set in `start.sh` |
 | Omarchy colors do not apply | Confirm `~/.config/omarchy/current/theme/colors.toml` exists, then restart Codex once |
+| Launcher does not appear immediately | Log out/in once, or refresh your desktop environment's app menu cache |
 
 ## Disclaimer
 

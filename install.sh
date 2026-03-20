@@ -284,17 +284,60 @@ install_app() {
 create_start_script() {
     cat > "$INSTALL_DIR/start.sh" << 'SCRIPT'
 #!/bin/bash
+set -Eeuo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEBVIEW_DIR="$SCRIPT_DIR/content/webview"
 THEME_SYNC_SCRIPT="$SCRIPT_DIR/sync-theme.py"
+HTTP_PID_FILE="$SCRIPT_DIR/.http-server.pid"
+THEME_PID_FILE="$SCRIPT_DIR/.theme-sync.pid"
+HTTP_URL="http://127.0.0.1:5175/"
 
-pkill -f "http.server 5175" 2>/dev/null
-sleep 0.3
+stop_pid_file() {
+    local pid_file="$1"
+    if [ -f "$pid_file" ]; then
+        local pid
+        pid="$(cat "$pid_file" 2>/dev/null || true)"
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+        fi
+        rm -f "$pid_file"
+    fi
+}
+
+cleanup() {
+    stop_pid_file "$HTTP_PID_FILE"
+    stop_pid_file "$THEME_PID_FILE"
+}
+
+trap cleanup EXIT
+
+stop_pid_file "$HTTP_PID_FILE"
+stop_pid_file "$THEME_PID_FILE"
 
 if [ -d "$WEBVIEW_DIR" ] && [ "$(ls -A "$WEBVIEW_DIR" 2>/dev/null)" ]; then
     cd "$WEBVIEW_DIR"
-    python3 -m http.server 5175 &> /dev/null &
+    python3 -m http.server 5175 --bind 127.0.0.1 &> /dev/null &
     HTTP_PID=$!
+    echo "$HTTP_PID" > "$HTTP_PID_FILE"
+
+    HTTP_READY=0
+    for _ in $(seq 1 50); do
+        if curl -fsS "$HTTP_URL" > /dev/null 2>&1; then
+            HTTP_READY=1
+            break
+        fi
+        if ! kill -0 "$HTTP_PID" 2>/dev/null; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    if [ "$HTTP_READY" -ne 1 ]; then
+        echo "Error: local webview server did not start on $HTTP_URL" >&2
+        exit 1
+    fi
 fi
 
 export CODEX_CLI_PATH="${CODEX_CLI_PATH:-$(which codex 2>/dev/null)}"
@@ -308,9 +351,8 @@ if [ -f "$THEME_SYNC_SCRIPT" ]; then
     python3 "$THEME_SYNC_SCRIPT" &> /dev/null || true
     python3 "$THEME_SYNC_SCRIPT" --watch &> /dev/null &
     THEME_PID=$!
+    echo "$THEME_PID" > "$THEME_PID_FILE"
 fi
-
-trap "kill ${HTTP_PID:-} ${THEME_PID:-} 2>/dev/null" EXIT
 
 cd "$SCRIPT_DIR"
 exec "$SCRIPT_DIR/electron" --no-sandbox "$@"
@@ -324,6 +366,38 @@ install_support_files() {
     cp "$SCRIPT_DIR/support/sync-theme.py" "$INSTALL_DIR/sync-theme.py"
     chmod +x "$INSTALL_DIR/sync-theme.py"
     info "Support files installed"
+}
+
+install_desktop_entry() {
+    local desktop_dir="$HOME/.local/share/applications"
+    local desktop_file="$desktop_dir/codex.desktop"
+    local icon_dest="$INSTALL_DIR/codex-icon.png"
+    local icon_source=""
+
+    mkdir -p "$desktop_dir"
+
+    icon_source=$(find "$INSTALL_DIR/content/webview/assets" -maxdepth 1 -type f -name 'app-*.png' | head -1 || true)
+    if [ -n "$icon_source" ]; then
+        cp "$icon_source" "$icon_dest"
+    fi
+
+    cat > "$desktop_file" <<DESKTOP
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Codex
+Comment=OpenAI Codex Desktop
+Exec=$INSTALL_DIR/start.sh
+Path=$INSTALL_DIR
+Icon=${icon_dest}
+Terminal=false
+Categories=Development;Utility;
+StartupWMClass=Codex
+StartupNotify=true
+DESKTOP
+
+    chmod +x "$desktop_file"
+    info "Desktop entry installed: $desktop_file"
 }
 
 # ---- Main ----
@@ -352,6 +426,7 @@ main() {
     install_app
     install_support_files
     create_start_script
+    install_desktop_entry
 
     if ! command -v codex &>/dev/null; then
         warn "Codex CLI not found. Install it: npm i -g @openai/codex"
